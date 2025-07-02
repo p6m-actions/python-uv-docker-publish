@@ -1,34 +1,92 @@
 name: "Python Uv Docker Publish"
-description: "A simple GitHub Action that prints a greeting"
+description: "Builds and publishes Python applications using UV as Docker containers"
 author: "Jimmie Fulton <jimmie.fulton@gmail.com>"
 
 # Define the inputs for this action
 inputs:
-  who-to-greet:
-    description: "Who to greet"
-    required: true
-    default: "World"
-  message:
-    description: "Custom message to include"
+  dockerfile-path:
+    description: "Path to the Dockerfile"
     required: false
-    default: "Hello"
+    default: "Dockerfile"
+  context-path:
+    description: "Build context path"
+    required: false
+    default: "."
+  image-name:
+    description: "Docker image name"
+    required: true
+  image-tag:
+    description: "Docker image tag"
+    required: false
+    default: "latest"
+  registry:
+    description: "Container registry URL"
+    required: false
+    default: ""
+  push:
+    description: "Whether to push the image to registry"
+    required: false
+    default: "true"
+  build-args:
+    description: "Build arguments for Docker build (multiline string)"
+    required: false
+    default: ""
+  platforms:
+    description: "Target platforms for multi-platform build"
+    required: false
+    default: "linux/amd64"
+  python-version:
+    description: "Python version to use in the Docker image"
+    required: false
+    default: "3.12"
+  uv-version:
+    description: "UV version to use for dependency management"
+    required: false
+    default: "latest"
 
 # Define the outputs for this action
 outputs:
-  time:
-    description: "The time we greeted you"
-    value: ${{ steps.hello.outputs.time }}
+  image-digest:
+    description: "The digest of the built image"
+    value: ${{ steps.build.outputs.digest }}
+  image-metadata:
+    description: "Build result metadata"
+    value: ${{ steps.build.outputs.metadata }}
+  image-uri:
+    description: "Full image URI with registry and tag"
+    value: ${{ steps.build.outputs.image-uri }}
 
 # Define the runs configuration
 runs:
   using: "composite"
   steps:
-    - name: Hello step
-      id: hello
+    - name: Set up Docker Buildx
+      uses: p6m-actions/docker-buildx-setup@v1
+
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: ${{ inputs.context-path }}
+        file: ${{ inputs.dockerfile-path }}
+        push: ${{ inputs.push }}
+        tags: ${{ inputs.registry && format('{0}/{1}:{2}', inputs.registry, inputs.image-name, inputs.image-tag) || format('{0}:{1}', inputs.image-name, inputs.image-tag) }}
+        build-args: |
+          PYTHON_VERSION=${{ inputs.python-version }}
+          UV_VERSION=${{ inputs.uv-version }}
+          ${{ inputs.build-args }}
+        platforms: ${{ inputs.platforms }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Set image URI output
       shell: bash
       run: |
-        echo "${{ inputs.message }}, ${{ inputs.who-to-greet }}!"
-        echo "time=$(date)" >> $GITHUB_OUTPUT
+        if [ -n "${{ inputs.registry }}" ]; then
+          echo "image-uri=${{ inputs.registry }}/${{ inputs.image-name }}:${{ inputs.image-tag }}" >> $GITHUB_OUTPUT
+        else
+          echo "image-uri=${{ inputs.image-name }}:${{ inputs.image-tag }}" >> $GITHUB_OUTPUT
+        fi
 
 # Define the branding for the action in the GitHub Marketplace
 branding:

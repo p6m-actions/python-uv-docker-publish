@@ -1,0 +1,28 @@
+# Example Dockerfile for Python UV projects
+# This demonstrates how to use this action with a typical Python UV setup
+
+ARG PYTHON_VERSION=3.12
+ARG UV_VERSION=latest
+
+FROM python:${PYTHON_VERSION}-slim
+
+# Install UV
+RUN pip install uv
+
+# Set working directory
+WORKDIR /app
+
+# Copy UV configuration files
+COPY pyproject.toml uv.lock ./
+
+# Install dependencies using UV
+RUN uv sync --frozen
+
+# Copy application code
+COPY . .
+
+# Expose port (adjust as needed)
+EXPOSE 8000
+
+# Set the entry point
+CMD ["uv", "run", "python", "-m", "your_app"]

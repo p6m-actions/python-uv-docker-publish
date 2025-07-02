@@ -1,3 +1,5 @@
+dotnet-docker-publish
+
 ### IntelliJ IDEA project files ###
 .idea/
 *.iws
